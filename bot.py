@@ -1,4 +1,4 @@
-# merchant-bot.com → 🎉 НОВЫЙ ТОКЕН VERSION → 100% ANTI-CONFLICT!
+# merchant-bot.com → ТВОЙ ДИЗАЙН → 100% РАБОТАЕТ!
 import logging
 import os
 import uvicorn
@@ -26,40 +26,39 @@ ptb_app = None
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🚀 /start от {update.effective_user.id}")
     
-    await update.message.reply_text(
-        "👟 Кроссовки Premium\n\n"
-        "💰 Самозанятый\n"
-        "✅ Быстрая доставка\n"
-        "🔥 Лучшие цены\n\n"
-        "Выберите модель:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛒 КЕДЫ", callback_data="kedu")],
-            [InlineKeyboardButton("🔥 New Balance", callback_data="new_balance")],
-            [InlineKeyboardButton("👑 Nike Air", callback_data="nike")]
-        ])
+    text = """Самозанятый Иванов Иван Иванович
+Зарегистрирован г.Минск ул Петра Мстиславца 9
+УНП 123456789
++375(29) 1112233
+
+Продаем только оригинальный товар!"""
+    
+    keyboard = [[InlineKeyboardButton("Выбрать товары", callback_data="catalog")]]
+    
+    await update.message.reply_photo(
+        photo="https://drive.google.com/uc?export=download&id=14qLvobylDK4j6N8a0rEONhFv8s8dP0Bd",
+        caption=text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if query.data == "kedu":
-        text = "👟 Кеды Premium - 105 BYN\n\n✅ Размер 39-45\n✅ Оригинал\n📦 Доставка 1-2 дня"
-        keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_kedu")]]
-    elif query.data == "new_balance":
-        text = "🔥 New Balance 550 - 250 BYN\n\n✅ Белые/Серые\n✅ EU 40-44\n💎 Premium качество"
-        keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nb")]]
-    elif query.data == "nike":
-        text = "👑 Nike Air Force 1 - 320 BYN\n\n✅ Классика\n✅ Все цвета\n⚡ В наличии"
-        keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nike")]]
-    else:
-        text = "✅ Заказ принят!\n\nНапишите в личку для оплаты и доставки:"
-        keyboard = [[InlineKeyboardButton("📱 Написать @ToshaSurovi", url="https://t.me/ToshaSurovi")]]
-    
-    await query.edit_message_text(
-        text=text,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    if query.data == "catalog":
+        # ТОВАР 1: Кеды Лидские
+        await query.message.reply_photo(
+            photo="https://drive.google.com/uc?export=download&id=111BeCUFi_saVPxGvgF3k0c4sWShBdJbC",
+            caption="👟 Кеды Лидские арт. 1234567\n\n💰 Цена 105 BYN",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
+        )
+        
+        # ТОВАР 2: New Balance
+        await query.message.reply_photo(
+            photo="https://drive.google.com/uc?export=download&id=1voH__n5tiTlbQVvljrZt7ecn-sxWZCpw",
+            caption="👟 Кроссовки New Balance Арт. 123456789\n\n💰 Цена 250 BYN",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
+        )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
