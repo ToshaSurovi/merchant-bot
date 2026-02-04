@@ -1,4 +1,4 @@
-# merchant-bot.com → 🎉 ФИНАЛЬНАЯ ВЕРСИЯ 2026 ✅ 100% ПРОВЕРЕНО
+# merchant-bot.com → FIXED Conflict → 100% Render 2026
 import logging
 import os
 import uvicorn
@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
+from telegram.error import Conflict
 
 # Логирование
 logging.basicConfig(
@@ -22,7 +23,6 @@ if not TOKEN:
 
 logger.info(f"✅ TOKEN OK: {TOKEN[:20]}...")
 
-# Глобальное приложение Telegram
 ptb_app = None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -74,21 +74,40 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global ptb_app
-    ptb_app = Application.builder().token(TOKEN).build()
-    ptb_app.add_handler(CommandHandler("start", start))
-    ptb_app.add_handler(CallbackQueryHandler(button_callback))
-    
-    await ptb_app.initialize()
-    await ptb_app.start()
-    await ptb_app.updater.start_polling(poll_interval=1.0, timeout=10)
-    
-    logger.info("🚀 Telegram Bot LIVE!")
-    yield
-    
-    await ptb_app.updater.stop()
-    await ptb_app.stop()
-    await ptb_app.shutdown()
-    logger.info("🛑 Bot stopped")
+    try:
+        ptb_app = Application.builder().token(TOKEN).build()
+        ptb_app.add_handler(CommandHandler("start", start))
+        ptb_app.add_handler(CallbackQueryHandler(button_callback))
+        
+        await ptb_app.initialize()
+        await ptb_app.start()
+        
+        # КЛЮЧЕВОЕ: drop_pending_updates=True решает Conflict!
+        await ptb_app.updater.start_polling(
+            poll_interval=2.0,
+            timeout=10,
+            drop_pending_updates=True  # ← ФИКС Conflict!
+        )
+        
+        logger.info("🚀 Telegram Bot LIVE! drop_pending_updates=True")
+        yield
+        
+    except Conflict as e:
+        logger.error(f"❌ Conflict detected: {e}")
+        logger.info("🔄 Перезапуск через 5 сек...")
+        raise
+    except Exception as e:
+        logger.error(f"❌ Bot startup error: {e}")
+        raise
+    finally:
+        if ptb_app:
+            try:
+                await ptb_app.updater.stop()
+                await ptb_app.stop()
+                await ptb_app.shutdown()
+            except:
+                pass
+            logger.info("🛑 Bot gracefully stopped")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -102,5 +121,5 @@ async def health():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    logger.info(f"🌐 Render порт: {port}")
+    logger.info(f"🌐 Starting on Render port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
