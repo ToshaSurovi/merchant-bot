@@ -68,7 +68,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(
             chat_id=chat_id, 
             photo=PRODUCT2_PHOTO,
-            caption="""<b>Кроссовки New Balance</b> Арт. <a href="tel:123456789">123456789</a>
+            caption="""<b>Кроссовки New Balance </b> Арт. <a href="tel:123456789">123456789</a>
 
 <b>Цена 250 BYN</b>""",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💳 Купить", 
@@ -103,3 +103,4 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
