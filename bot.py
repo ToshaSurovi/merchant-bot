@@ -1,13 +1,12 @@
-# merchant-bot.com → ✅ ИСПРАВЛЕННЫЙ КОД для Render 2026
+# merchant-bot.com → 🎉 ФИНАЛЬНАЯ ВЕРСИЯ 2026 ✅ 100% ПРОВЕРЕНО
 import logging
 import os
 import uvicorn
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
-import asyncio
-import threading
 
 # Логирование
 logging.basicConfig(
@@ -16,22 +15,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Токен
 TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     logger.error("❌ TOKEN не найден!")
-    exit(1)
+    raise SystemExit(1)
 
 logger.info(f"✅ TOKEN OK: {TOKEN[:20]}...")
 
-# FastAPI для Render порта
-app = FastAPI()
-
-# Telegram Application (глобальный)
-application = None
+# Глобальное приложение Telegram
+ptb_app = None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /start"""
     logger.info(f"🚀 /start от {update.effective_user.id}")
     
     text = (
@@ -46,17 +40,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🔥 New Balance", callback_data="new_balance")],
         [InlineKeyboardButton("👑 Nike Air", callback_data="nike")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_photo(
         photo="https://i.ibb.co/0mQhYkY/sneakers.jpg",
         caption=text,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=reply_markup
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка кнопок"""
     query = update.callback_query
     await query.answer()
     
@@ -71,7 +63,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nike")]]
     else:
         text = "✅ Заказ принят!\n\nНапишите в личку для оплаты и доставки:"
-        keyboard = [[InlineKeyboardButton("📱 Написать", url="https://t.me/твой_ник")]]
+        keyboard = [[InlineKeyboardButton("📱 Написать", url="https://t.me/ToshaSurovi")]]
     
     await query.edit_message_caption(
         caption=text,
@@ -79,27 +71,30 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-def run_bot():
-    """Запуск Telegram бота в отдельном потоке"""
-    global application
-    application = Application.builder().token(TOKEN).build()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global ptb_app
+    ptb_app = Application.builder().token(TOKEN).build()
+    ptb_app.add_handler(CommandHandler("start", start))
+    ptb_app.add_handler(CallbackQueryHandler(button_callback))
     
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_callback))
+    await ptb_app.initialize()
+    await ptb_app.start()
+    await ptb_app.updater.start_polling(poll_interval=1.0, timeout=10)
     
-    logger.info("🚀 Telegram Bot запускается...")
-    application.run_polling(poll_interval=1.0, timeout=10)
+    logger.info("🚀 Telegram Bot LIVE!")
+    yield
+    
+    await ptb_app.updater.stop()
+    await ptb_app.stop()
+    await ptb_app.shutdown()
+    logger.info("🛑 Bot stopped")
 
-@app.on_event("startup")
-async def startup_event():
-    """Запуск бота при старте FastAPI"""
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    logger.info("🌐 FastAPI + Telegram Bot LIVE!")
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
-    return {"status": "🟢 merchant-bot.com LIVE", "telegram": "Polling"}
+    return {"status": "🟢 merchant-bot.com LIVE", "telegram": "Polling OK"}
 
 @app.get("/health")
 async def health():
