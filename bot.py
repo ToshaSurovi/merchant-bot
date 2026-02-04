@@ -1,77 +1,39 @@
-# merchant-bot.com → ПОЛНЫЙ КОД для Render 2026
+# merchant-bot.com → ✅ ИСПРАВЛЕННЫЙ КОД для Render 2026
 import logging
 import os
-from fastapi import FastAPI, Request
-from contextlib import asynccontextmanager
+import uvicorn
+from fastapi import FastAPI
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from telegram.constants import ParseMode
+import asyncio
+import threading
 
-# Настройка логирования
+# Логирование
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Токен из Environment Variables Render
+# Токен
 TOKEN = os.getenv("TOKEN")
 if not TOKEN:
-    logger.error("❌ TOKEN не найден в Environment Variables!")
-    raise ValueError("TOKEN required")
+    logger.error("❌ TOKEN не найден!")
+    exit(1)
 
-# FastAPI lifespan для Telegram Bot
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Создаем приложение Telegram
-    app_state.ptb = Application.builder().token(TOKEN).build()
-    
-    # Добавляем handlers
-    app_state.ptb.add_handler(CommandHandler("start", start))
-    app_state.ptb.add_handler(CallbackQueryHandler(button_callback))
-    
-    # Запускаем бота
-    await app_state.ptb.initialize()
-    await app_state.ptb.start()
-    await app_state.ptb.updater.start_polling(poll_interval=1.0, timeout=10)
-    
-    logger.info("🚀 Telegram Background Worker запускается...")
-    yield
-    
-    # Останавливаем бота
-    await app_state.ptb.updater.stop()
-    await app_state.ptb.stop()
-    await app_state.ptb.shutdown()
-    logger.info("🛑 Telegram Bot остановлен")
+logger.info(f"✅ TOKEN OK: {TOKEN[:20]}...")
 
-# Глобальное состояние
-app_state = FastAPI()
+# FastAPI для Render порта
+app = FastAPI()
 
-# FastAPI приложение
-app = FastAPI(lifespan=lifespan)
+# Telegram Application (глобальный)
+application = None
 
-@app.get("/")
-async def root():
-    """Health check для Render"""
-    return {"status": "🟢 merchant-bot.com LIVE", "telegram": "OK"}
-
-@app.post("/telegram")
-async def telegram_webhook(request: Request):
-    """Webhook для Telegram (опционально)"""
-    try:
-        update = Update.de_json(await request.json(), app_state.ptb.bot)
-        await app_state.ptb.update_queue.put(update)
-        return {"status": "ok"}
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return {"status": "error"}
-
-# Telegram Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start"""
     logger.info(f"🚀 /start от {update.effective_user.id}")
     
-    # Титульное сообщение
     text = (
         "👟 **Кроссовки Premium**\n\n"
         "💰 Самозанятый\n"
@@ -79,7 +41,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔥 Лучшие цены"
     )
     
-    # Кнопки каталога
     keyboard = [
         [InlineKeyboardButton("🛒 КЕДЫ", callback_data="kedu")],
         [InlineKeyboardButton("🔥 New Balance", callback_data="new_balance")],
@@ -102,15 +63,12 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "kedu":
         text = "👟 **Кеды Premium** 105 BYN\n\n✅ Размер 39-45\n✅ Оригинал\n📦 Доставка 1-2 дня"
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_kedu")]]
-        
     elif query.data == "new_balance":
         text = "🔥 **New Balance 550** 250 BYN\n\n✅ Белые/Серые\n✅ EU 40-44\n💎 Premium качество"
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nb")]]
-    
     elif query.data == "nike":
         text = "👑 **Nike Air Force 1** 320 BYN\n\n✅ Классика\n✅ Все цвета\n⚡ В наличии"
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nike")]]
-    
     else:
         text = "✅ Заказ принят!\n\nНапишите в личку для оплаты и доставки:"
         keyboard = [[InlineKeyboardButton("📱 Написать", url="https://t.me/твой_ник")]]
@@ -121,8 +79,33 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
+def run_bot():
+    """Запуск Telegram бота в отдельном потоке"""
+    global application
+    application = Application.builder().token(TOKEN).build()
+    
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_callback))
+    
+    logger.info("🚀 Telegram Bot запускается...")
+    application.run_polling(poll_interval=1.0, timeout=10)
+
+@app.on_event("startup")
+async def startup_event():
+    """Запуск бота при старте FastAPI"""
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    logger.info("🌐 FastAPI + Telegram Bot LIVE!")
+
+@app.get("/")
+async def root():
+    return {"status": "🟢 merchant-bot.com LIVE", "telegram": "Polling"}
+
+@app.get("/health")
+async def health():
+    return {"status": "OK"}
+
 if __name__ == "__main__":
-    import uvicorn
     port = int(os.environ.get("PORT", 10000))
-    logger.info(f"🌐 Запуск на порту {port}")
+    logger.info(f"🌐 Render порт: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
