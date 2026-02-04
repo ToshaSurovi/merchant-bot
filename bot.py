@@ -1,33 +1,35 @@
 import logging
 import os
-import asyncio
+import uvicorn
+from fastapi import FastAPI
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from fastapi import FastAPI
-import uvicorn
 
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 TOKEN = os.environ.get('TOKEN', '8339938445:AAGgDjcHBKbF0l7lDrhoktanSOAyQYRJR20')
 
 MAIN_PHOTO = "https://imagizer.imageshack.com/img924/2237/7sxBBH.png"
 PRODUCT1_PHOTO = "https://imagizer.imageshack.com/img922/9003/TrMGJ5.jpg"
 PRODUCT2_PHOTO = "https://imagizer.imageshack.com/img921/8790/4gtW6O.jpg"
 
-# FastAPI для Render port binding
-web_app = FastAPI()
+# FastAPI для Render
+app = FastAPI()
 
-@web_app.get("/")
+@app.get("/")
 async def root():
-    return {"status": "Merchant Bot OK", "telegram": "polling", "uptime": "24/7"}
+    return {"status": "Merchant Bot OK", "telegram": "polling", "uptime": "live"}
 
-@web_app.get("/health")
+@app.get("/health")
 async def health():
     return {"status": "healthy", "bot": "active"}
 
-# Telegram Bot функции
+# Telegram handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    print(f"🚀 /start от {chat_id}")
+    logger.info(f"🚀 /start от {chat_id}")
     
     keyboard = [[InlineKeyboardButton("🛒 Выбрать товары", callback_data='products')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -75,31 +77,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 url='https://www.alfabank.by/business/payment/internet-acquiring/')]]),
             parse_mode='HTML'
         )
+        logger.info("✅ Товары отправлены!")
 
-async def run_bot():
-    """Запуск Telegram бота в фоне"""
-    application = Application.builder().token(TOKEN).build()
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CallbackQueryHandler(button_handler))
+def main():
+    logger.info("🚀 MerchantTemplateBot на Render.com")
+    logger.info(f"TOKEN: {TOKEN[:10]}...")
     
-    print("🚀 Telegram Bot запущен (polling)")
-    await application.run_polling(drop_pending_updates=True)
-
-async def main():
-    """Запуск Web + Bot"""
-    print("🚀 MerchantTemplateBot на Render.com (Web+Bot)")
-    print(f"TOKEN: {TOKEN[:10]}...")
-    
-    # Запуск бота в фоне
-    bot_task = asyncio.create_task(run_bot())
-    
-    # Запуск Web сервера
+    # 1. Web сервер для Render (главное!)
     port = int(os.environ.get('PORT', 10000))
-    config = uvicorn.Config(web_app, host="0.0.0.0", port=port, log_level="info")
+    config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
-    
-    print(f"🌐 Web сервер на порту {port}")
-    await server.serve()
+    server.serve()  # Render ждет ЭТОТ порт!
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
