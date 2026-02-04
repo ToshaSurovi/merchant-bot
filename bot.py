@@ -1,44 +1,85 @@
 import logging
 import os
-from fastapi import FastAPI
-import uvicorn
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# ДЕБАГ ЛОГИ
+print("🔧 telegram_bot.py старт...")
+print(f"TOKEN из ENV: '{os.environ.get('TOKEN')}'")
+print(f"TOKEN длина: {len(os.environ.get('TOKEN', '')) if os.environ.get('TOKEN') else 'НЕ НАЙДЕН'}")
 
-TOKEN = os.environ.get('TOKEN', '8339938445:AAGgDjcHBKbF0l7lDrhoktanSOAyQYRJR20')
+TOKEN = os.environ.get('TOKEN')
+if not TOKEN:
+    print("❌ ОШИБКА: TOKEN не найден в Environment Variables!")
+    exit(1)
 
-app = FastAPI()
+print(f"✅ TOKEN OK: {TOKEN[:10]}...")
 
-@app.get("/")
-async def root():
-    return {
-        "status": "Merchant Web OK", 
-        "telegram_bot": "deployed_separately", 
-        "url": "https://merchant-bot-cs1d.onrender.com",
-        "token": TOKEN[:10] + "..."
-    }
+MAIN_PHOTO = "https://imagizer.imageshack.com/img924/2237/7sxBBH.png"
+PRODUCT1_PHOTO = "https://imagizer.imageshack.com/img922/9003/TrMGJ5.jpg"
+PRODUCT2_PHOTO = "https://imagizer.imageshack.com/img921/8790/4gtW6O.jpg"
 
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "service": "web_ok"}
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    print(f"🚀 /start от {chat_id}")
+    
+    keyboard = [[InlineKeyboardButton("🛒 Выбрать товары", callback_data='products')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-@app.get("/info")
-async def info():
-    return {
-        "merchant": "Иванов Иван Иванович",
-        "location": "г.Минск ул Петра Мстиславца 9", 
-        "упн": "123456789",
-        "phone": "+375(29) 1112233"
-    }
+    await context.bot.send_photo(
+        chat_id=chat_id, 
+        photo=MAIN_PHOTO, 
+        caption="""
+<b>Самозанятый Иванов Иван Иванович</b>
+Зарегистрирован г.Минск ул Петра Мстиславца 9
+УНП <a href="tel:123456789">123456789</a>
++375(29) 1112233
 
-if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 10000))
-    logger.info(f"🚀 Merchant Web Server на порту {port}")
-    uvicorn.run(
-        "bot:app", 
-        host="0.0.0.0", 
-        port=port,
-        log_level="info",
-        reload=False
+<b>Продаем только оригинальный товар!</b>
+        """, 
+        reply_markup=reply_markup, 
+        parse_mode='HTML'
     )
+    print("✅ /start отправлен!")
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    print(f"🔘 Кнопка: {query.data}")
+    
+    if query.data == 'products':
+        chat_id = query.message.chat_id
+        
+        await context.bot.send_photo(
+            chat_id=chat_id, 
+            photo=PRODUCT1_PHOTO,
+            caption="""<b>Кеды Лидские</b> арт. 1234567
+
+<b>Цена 105 BYN</b>""",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💳 Купить", 
+                url='https://www.alfabank.by/business/payment/internet-acquiring/')]]),
+            parse_mode='HTML'
+        )
+        
+        await context.bot.send_photo(
+            chat_id=chat_id, 
+            photo=PRODUCT2_PHOTO,
+            caption="""<b>Кроссовки New Balance</b> Арт. <a href="tel:123456789">123456789</a>
+
+<b>Цена 250 BYN</b>""",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💳 Купить", 
+                url='https://www.alfabank.by/business/payment/internet-acquiring/')]]),
+            parse_mode='HTML'
+        )
+        print("✅ Товары отправлены!")
+
+if __name__ == '__main__':
+    print("🚀 Telegram Background Worker запускается...")
+    try:
+        app = Application.builder().token(TOKEN).build()
+        app.add_handler(CommandHandler('start', start))
+        app.add_handler(CallbackQueryHandler(button_handler))
+        print("✅ Бот настроен, начинаем polling...")
+        app.run_polling(drop_pending_updates=True)
+    except Exception as e:
+        print(f"❌ ОШИБКА БОТА: {e}")
