@@ -1,11 +1,11 @@
 import logging
 import os
-import uvicorn
+import asyncio
 from fastapi import FastAPI
+import uvicorn
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -20,13 +20,13 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"status": "Merchant Bot OK", "telegram": "polling", "uptime": "live"}
+    return {"status": "Merchant Bot OK", "telegram": "active", "url": "https://merchant-bot-cs1d.onrender.com"}
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "bot": "active"}
+    return {"status": "healthy", "timestamp": "live"}
 
-# Telegram handlers
+# Telegram handlers (копируются в Background Worker)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     logger.info(f"🚀 /start от {chat_id}")
@@ -77,17 +77,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 url='https://www.alfabank.by/business/payment/internet-acquiring/')]]),
             parse_mode='HTML'
         )
-        logger.info("✅ Товары отправлены!")
 
-def main():
+async def run_telegram_bot():
+    """Telegram Bot polling"""
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    
+    logger.info("🚀 Telegram Bot запущен!")
+    await application.run_polling(drop_pending_updates=True)
+
+async def main():
     logger.info("🚀 MerchantTemplateBot на Render.com")
     logger.info(f"TOKEN: {TOKEN[:10]}...")
     
-    # 1. Web сервер для Render (главное!)
+    # Запуск бота и веб-сервера ПАРАЛЛЕЛЬНО
+    bot_task = asyncio.create_task(run_telegram_bot())
+    web_task = asyncio.create_task(start_web_server())
+    
+    await asyncio.gather(bot_task, web_task)
+
+async def start_web_server():
+    """FastAPI сервер для Render"""
     port = int(os.environ.get('PORT', 10000))
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="info")
     server = uvicorn.Server(config)
-    server.serve()  # Render ждет ЭТОТ порт!
+    logger.info(f"🌐 Web сервер на порту {port}")
+    await server.serve()  # ✅ AWAIT!
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
