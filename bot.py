@@ -1,4 +1,4 @@
-# merchant-bot.com → FIXED Conflict → 100% Render 2026
+# merchant-bot.com → 🎉 ФИНАЛЬНАЯ ВЕРСИЯ → 100% Render 2026
 import logging
 import os
 import uvicorn
@@ -6,8 +6,6 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from telegram.constants import ParseMode
-from telegram.error import Conflict
 
 # Логирование
 logging.basicConfig(
@@ -28,12 +26,11 @@ ptb_app = None
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🚀 /start от {update.effective_user.id}")
     
-    text = (
-        "👟 **Кроссовки Premium**\n\n"
-        "💰 Самозанятый\n"
-        "✅ Быстрая доставка\n"
-        "🔥 Лучшие цены"
-    )
+    text = """Кроссовки Premium
+
+Самозанятый
+Быстрая доставка
+Лучшие цены"""
     
     keyboard = [
         [InlineKeyboardButton("🛒 КЕДЫ", callback_data="kedu")],
@@ -44,7 +41,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_photo(
         photo="https://i.ibb.co/0mQhYkY/sneakers.jpg",
         caption=text,
-        parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -53,21 +49,34 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     if query.data == "kedu":
-        text = "👟 **Кеды Premium** 105 BYN\n\n✅ Размер 39-45\n✅ Оригинал\n📦 Доставка 1-2 дня"
+        text = """Кеды Premium 105 BYN
+
+Размер 39-45
+Оригинал
+Доставка 1-2 дня"""
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_kedu")]]
     elif query.data == "new_balance":
-        text = "🔥 **New Balance 550** 250 BYN\n\n✅ Белые/Серые\n✅ EU 40-44\n💎 Premium качество"
+        text = """New Balance 550 250 BYN
+
+Белые/Серые
+EU 40-44
+Premium качество"""
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nb")]]
     elif query.data == "nike":
-        text = "👑 **Nike Air Force 1** 320 BYN\n\n✅ Классика\n✅ Все цвета\n⚡ В наличии"
+        text = """Nike Air Force 1 320 BYN
+
+Классика
+Все цвета
+В наличии"""
         keyboard = [[InlineKeyboardButton("🛒 Купить", callback_data="buy_nike")]]
     else:
-        text = "✅ Заказ принят!\n\nНапишите в личку для оплаты и доставки:"
+        text = """✅ Заказ принят!
+
+Напишите в личку для оплаты и доставки:"""
         keyboard = [[InlineKeyboardButton("📱 Написать", url="https://t.me/ToshaSurovi")]]
     
     await query.edit_message_caption(
         caption=text,
-        parse_mode=ParseMode.MARKDOWN,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -82,22 +91,17 @@ async def lifespan(app: FastAPI):
         await ptb_app.initialize()
         await ptb_app.start()
         
-        # КЛЮЧЕВОЕ: drop_pending_updates=True решает Conflict!
         await ptb_app.updater.start_polling(
             poll_interval=2.0,
             timeout=10,
-            drop_pending_updates=True  # ← ФИКС Conflict!
+            drop_pending_updates=True
         )
         
-        logger.info("🚀 Telegram Bot LIVE! drop_pending_updates=True")
+        logger.info("🚀 Telegram Bot LIVE! ✅ merchant-bot.com")
         yield
         
-    except Conflict as e:
-        logger.error(f"❌ Conflict detected: {e}")
-        logger.info("🔄 Перезапуск через 5 сек...")
-        raise
     except Exception as e:
-        logger.error(f"❌ Bot startup error: {e}")
+        logger.error(f"❌ Bot error: {e}")
         raise
     finally:
         if ptb_app:
@@ -121,5 +125,5 @@ async def health():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    logger.info(f"🌐 Starting on Render port: {port}")
+    logger.info(f"🌐 Render порт: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
