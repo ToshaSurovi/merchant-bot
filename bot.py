@@ -4,7 +4,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 logging.basicConfig(level=logging.INFO)
-TOKEN = '8339938445:AAGgDjcHBKbF0l7lDrhoktanSOAyQYRJR20'
+TOKEN = os.environ.get('TOKEN', '8339938445:AAGgDjcHBKbF0l7lDrhoktanSOAyQYRJR20')
 
 MAIN_PHOTO = "https://imagizer.imageshack.com/img924/2237/7sxBBH.png"
 PRODUCT1_PHOTO = "https://imagizer.imageshack.com/img922/9003/TrMGJ5.jpg"
@@ -17,7 +17,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🛒 Выбрать товары", callback_data='products')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await context.bot.send_photo(chat_id=chat_id, photo=MAIN_PHOTO, 
+    await context.bot.send_photo(
+        chat_id=chat_id, 
+        photo=MAIN_PHOTO, 
         caption="""
 <b>Самозанятый Иванов Иван Иванович</b>
 Зарегистрирован г.Минск ул Петра Мстиславца 9
@@ -25,7 +27,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 +375(29) 1112233
 
 <b>Продаем только оригинальный товар!</b>
-        """, reply_markup=reply_markup, parse_mode='HTML')
+        """, 
+        reply_markup=reply_markup, 
+        parse_mode='HTML'
+    )
+    print("✅ Главная картинка отправлена!")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -34,29 +40,39 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == 'products':
         chat_id = query.message.chat_id
         
-        await context.bot.send_photo(chat_id=chat_id, photo=PRODUCT1_PHOTO,
-            caption="""<b> Кеды Лидские</b> арт. 1234567\n<b>Цена 105 BYN</b>""",
+        await context.bot.send_photo(
+            chat_id=chat_id, 
+            photo=PRODUCT1_PHOTO,
+            caption="""<b>Кеды Лидские</b> арт. 1234567
+
+<b>Цена 105 BYN</b>""",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💳 Купить", 
                 url='https://www.alfabank.by/business/payment/internet-acquiring/')]]),
-            parse_mode='HTML')
+            parse_mode='HTML'
+        )
         
-        await context.bot.send_photo(chat_id=chat_id, photo=PRODUCT2_PHOTO,
-            caption="""<b> Кроссовки New Balance</b> Арт. <a href="tel:123456789">123456789</a>\n<b>Цена 250 BYN</b>""",
+        await context.bot.send_photo(
+            chat_id=chat_id, 
+            photo=PRODUCT2_PHOTO,
+            caption="""<b>Кроссовки New Balance</b> Арт. <a href="tel:123456789">123456789</a>
+
+<b>Цена 250 BYN</b>""",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💳 Купить", 
                 url='https://www.alfabank.by/business/payment/internet-acquiring/')]]),
-            parse_mode='HTML')
+            parse_mode='HTML'
+        )
+        print("✅ Товары отправлены!")
 
 def main():
+    print("🚀 MerchantTemplateBot на Render.com (POLLING)")
+    print(f"TOKEN: {TOKEN[:10]}...")
+    
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    port = int(os.environ.get('PORT', 8443))
-    application.run_webhook(
-        listen="0.0.0.0", port=port, 
-        url_path=TOKEN,
-        webhook_url=f"https://YOUR-APP-NAME.onrender.com/{TOKEN}"  # ← ЗАМЕНИ!
-    )
+    print("✅ Бот запущен! Тестируйте /start")
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
     main()
