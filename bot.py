@@ -1,4 +1,4 @@
-# merchant-bot.com → 🎉 ФИНАЛЬНАЯ ВЕРСИЯ → 100% ГАРАНТИЯ!
+# merchant-bot.com → 🎉 НОВЫЙ ТОКЕН VERSION → 100% ANTI-CONFLICT!
 import logging
 import os
 import uvicorn
@@ -19,7 +19,7 @@ if not TOKEN:
     logger.error("❌ TOKEN не найден!")
     raise SystemExit(1)
 
-logger.info(f"✅ TOKEN OK: {TOKEN[:20]}...")
+logger.info(f"✅ NEW TOKEN OK: {TOKEN[:20]}...")
 
 ptb_app = None
 
@@ -65,6 +65,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def lifespan(app: FastAPI):
     global ptb_app
     try:
+        logger.info("🔄 Инициализация бота...")
         ptb_app = Application.builder().token(TOKEN).build()
         ptb_app.add_handler(CommandHandler("start", start))
         ptb_app.add_handler(CallbackQueryHandler(button_callback))
@@ -82,7 +83,7 @@ async def lifespan(app: FastAPI):
         yield
         
     except Exception as e:
-        logger.error(f"❌ Bot error: {e}")
+        logger.error(f"❌ Ошибка бота: {e}")
         raise
     finally:
         if ptb_app:
@@ -92,17 +93,13 @@ async def lifespan(app: FastAPI):
                 await ptb_app.shutdown()
             except:
                 pass
-            logger.info("🛑 Bot gracefully stopped")
+            logger.info("🛑 Bot остановлен")
 
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
     return {"status": "🟢 merchant-bot.com LIVE", "telegram": "Polling OK"}
-
-@app.get("/health")
-async def health():
-    return {"status": "OK"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
