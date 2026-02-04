@@ -12,7 +12,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Environment variables
 TOKEN = os.getenv("TOKEN")
 RENDER_URL = os.getenv("RENDER_URL", "https://merchant-bot-cs1d.onrender.com")
 WEBHOOK_URL = f"{RENDER_URL.rstrip('/')}/webhook"
@@ -21,10 +20,10 @@ if not TOKEN:
     logger.error("❌ TOKEN не найден!")
     raise SystemExit(1)
 
-logger.info(f"✅ TOKEN OK: {TOKEN[:20]}...")
-logger.info(f"🌐 WEBHOOK URL: {WEBHOOK_URL}")
+logger.info(f"✅ TOKEN: {TOKEN[:10]}...")
+logger.info(f"🌐 WEBHOOK: {WEBHOOK_URL}")
 
-# Твои хендлеры (без изменений)
+# Твои хендлеры
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🚀 /start от {update.effective_user.id}")
     text = """Самозанятый Иванов Иван Иванович
@@ -33,9 +32,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 +375(29) 1112233
 
 Продаем только оригинальный товар!"""
-    
     keyboard = [[InlineKeyboardButton("Выбрать товары", callback_data="catalog")]]
-    
     await update.message.reply_photo(
         photo="https://drive.google.com/uc?export=download&id=14qLvobylDK4j6N8a0rEONhFv8s8dP0Bd",
         caption=text,
@@ -45,92 +42,80 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     if query.data == "catalog":
-        # Кеды Лидские
         await query.message.reply_photo(
             photo="https://drive.google.com/uc?export=download&id=111BeCUFi_saVPxGvgF3k0c4sWShBdJbC",
             caption="👟 Кеды Лидские арт. 1234567\n\n💰 Цена 105 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
-        # New Balance
         await query.message.reply_photo(
             photo="https://drive.google.com/uc?export=download&id=1voH__n5tiTlbQVvljrZt7ecn-sxWZCpw",
             caption="👟 Кроссовки New Balance Арт. 123456789\n\n💰 Цена 250 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
 
-# Глобальное состояние бота
+# Глобальное состояние
 application = None
+bot_ready = False
 
 app = FastAPI()
 
 @app.on_event("startup")
-async def startup_event():
-    global application
-    logger.info("🔄 Инициализация Telegram бота...")
+async def startup():
+    global application, bot_ready
+    logger.info("🔄 Инициализация...")
     
     try:
-        # Создаем приложение Telegram
+        # Создание приложения
         application = Application.builder().token(TOKEN).build()
-        
-        # Добавляем хендлеры
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CallbackQueryHandler(button_callback))
         
-        # ✅ Удаляем старый webhook
-        await application.bot.delete_webhook(drop_pending_updates=True)
-        logger.info("🗑️ Старый webhook удален")
+        # ✅ КРИТИЧНО: правильная последовательность v20.7
+        await application.initialize()
+        await application.start()
         
-        # ✅ Устанавливаем новый webhook
+        # Webhook
+        await application.bot.delete_webhook(drop_pending_updates=True)
         await application.bot.set_webhook(WEBHOOK_URL)
         
-        # Проверяем установку
         webhook_info = await application.bot.get_webhook_info()
-        logger.info(f"✅ WEBHOOK УСТАНОВЛЕН: {webhook_info.url}")
+        logger.info(f"✅ WEBHOOK OK: {webhook_info.url}")
+        bot_ready = True
         
     except Exception as e:
-        logger.error(f"❌ Ошибка инициализации бота: {e}")
+        logger.error(f"❌ Startup error: {e}")
         raise
 
 @app.get("/")
 async def root():
-    return {
-        "status": "🟢 merchant-bot.com LIVE 24/7",
-        "webhook": WEBHOOK_URL,
-        "bot_ready": application is not None
-    }
+    return {"status": "🟢 LIVE", "webhook": WEBHOOK_URL, "ready": bot_ready}
 
 @app.get("/ping")
 async def ping():
-    return {"status": "pong 🏓", "live": True, "bot_ready": application is not None}
+    return {"status": "pong 🏓", "ready": bot_ready}
 
 @app.post("/webhook")
 async def webhook(request: Request):
-    global application
+    global application, bot_ready
     
-    if not application:
-        raise HTTPException(status_code=503, detail="🤖 Бот загружается...")
+    if not bot_ready or not application:
+        raise HTTPException(status_code=503, detail="Bot loading...")
     
     try:
-        # Получаем JSON от Telegram
         json_update = await request.json()
-        
-        # Парсим update
         update = Update.de_json(json_update, application.bot)
         
         if update and update.to_dict():
-            # Обрабатываем сообщение
             await application.process_update(update)
-            logger.info("✅ Update обработан")
+            logger.info("✅ Processed")
         
-        return {"status": "ok"}
-        
+        return {"ok": True}
     except Exception as e:
-        logger.error(f"❌ Ошибка webhook: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обработки webhook")
+        logger.error(f"❌ Webhook: {e}")
+        raise HTTPException(status_code=500)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    logger.info(f"🌐 FastAPI сервер на порту {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    logger.info(f"🌐 Port: {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
