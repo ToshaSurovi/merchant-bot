@@ -1,8 +1,7 @@
-# merchant-bot.com → ТВОЙ ДИЗАЙН → 100% РАБОТАЕТ!
 import logging
 import os
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from contextlib import asynccontextmanager
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -15,14 +14,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("TOKEN")
+RENDER_URL = os.getenv("RENDER_URL", "https://your-bot.onrender.com")
+WEBHOOK_URL = f"{RENDER_URL.rstrip('/')}/webhook"
+
 if not TOKEN:
     logger.error("❌ TOKEN не найден!")
     raise SystemExit(1)
 
-logger.info(f"✅ NEW TOKEN OK: {TOKEN[:20]}...")
+logger.info(f"✅ TOKEN OK: {TOKEN[:20]}...")
+logger.info(f"🌐 WEBHOOK URL: {WEBHOOK_URL}")
 
-ptb_app = None
-
+# Хендлеры (твоя логика)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"🚀 /start от {update.effective_user.id}")
     
@@ -46,59 +48,73 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     if query.data == "catalog":
-        # ТОВАР 1: Кеды Лидские
+        # Кеды Лидские
         await query.message.reply_photo(
             photo="https://drive.google.com/uc?export=download&id=111BeCUFi_saVPxGvgF3k0c4sWShBdJbC",
             caption="👟 Кеды Лидские арт. 1234567\n\n💰 Цена 105 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
         
-        # ТОВАР 2: New Balance
+        # New Balance
         await query.message.reply_photo(
             photo="https://drive.google.com/uc?export=download&id=1voH__n5tiTlbQVvljrZt7ecn-sxWZCpw",
             caption="👟 Кроссовки New Balance Арт. 123456789\n\n💰 Цена 250 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
 
+# Глобальное состояние
+application = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global ptb_app
-    try:
-        logger.info("🔄 Инициализация бота...")
-        ptb_app = Application.builder().token(TOKEN).build()
-        ptb_app.add_handler(CommandHandler("start", start))
-        ptb_app.add_handler(CallbackQueryHandler(button_callback))
-        
-        await ptb_app.initialize()
-        await ptb_app.start()
-        
-        await ptb_app.updater.start_polling(
-            poll_interval=2.0,
-            timeout=10,
-            drop_pending_updates=True
-        )
-        
-        logger.info("🚀 Telegram Bot LIVE! ✅ merchant-bot.com")
-        yield
-        
-    except Exception as e:
-        logger.error(f"❌ Ошибка бота: {e}")
-        raise
-    finally:
-        if ptb_app:
-            try:
-                await ptb_app.updater.stop()
-                await ptb_app.stop()
-                await ptb_app.shutdown()
-            except:
-                pass
-            logger.info("🛑 Bot остановлен")
+    global application
+    logger.info("🔄 Инициализация webhook...")
+    
+    # Создаем приложение Telegram
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_callback))
+    
+    # ✅ КРИТИЧНО: Удаляем старые webhook'и
+    await application.bot.delete_webhook(drop_pending_updates=True)
+    
+    # Устанавливаем новый webhook
+    await application.bot.set_webhook(WEBHOOK_URL)
+    
+    webhook_info = await application.bot.get_webhook_info()
+    logger.info(f"✅ Webhook установлен: {webhook_info.url}")
+    
+    yield  # FastAPI запущен
+    
+    # Cleanup
+    if application:
+        await application.bot.delete_webhook()
+        logger.info("🛑 Webhook удален")
 
+# FastAPI приложение
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
-    return {"status": "🟢 merchant-bot.com LIVE", "telegram": "Polling OK"}
+    return {"status": "🟢 merchant-bot.com LIVE 24/7", "webhook": WEBHOOK_URL}
+
+@app.get("/ping")
+async def ping():
+    return {"status": "pong 🏓", "time": "online 24/7"}
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    global application
+    if not application:
+        raise HTTPException(status_code=503, detail="Bot not ready")
+    
+    json_update = await request.json()
+    update = Update.de_json(json_update, application.bot)
+    
+    if update:
+        await application.process_update(update)
+    
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
