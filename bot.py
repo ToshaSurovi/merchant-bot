@@ -92,8 +92,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.get("/")
-async def root():
+@app.get("/", include_in_schema=False)  # ✅ Работает с HEAD!
+async def root(request: Request):
+    if request.method == "HEAD":
+        return Response(status_code=200)    # ✅ Render НЕ убивает!
     return {"status": "🟢 LIVE", "webhook": WEBHOOK_URL, "ready": bot_ready}
 
 @app.get("/ping")
@@ -128,5 +130,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🌐 Port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
