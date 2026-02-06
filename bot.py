@@ -34,7 +34,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 Продаем только оригинальный товар!"""
     keyboard = [[InlineKeyboardButton("Выбрать товары", callback_data="catalog")]]
     await update.message.reply_photo(
-        photo="https://drive.google.com/uc?export=download&id=14qLvobylDK4j6N8a0rEONhFv8s8dP0Bd",
+        photo="https://drive.google.com/uc?export=download&id=1YmdAxQZD5GDnzV08HG429StHM4pFll05",
         caption=text,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -119,3 +119,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🌐 Port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
