@@ -1,11 +1,15 @@
 import logging
 import os
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
-# Логирование
+# Глобальное состояние
+updater = None
+bot_ready = False
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -23,8 +27,8 @@ if not TOKEN:
 logger.info(f"✅ TOKEN: {TOKEN[:10]}...")
 logger.info(f"🌐 WEBHOOK: {WEBHOOK_URL}")
 
-# Твои хендлеры
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ✅ v13.15 СИНХРОННЫЕ хендлеры
+def start(update: Update, context):
     logger.info(f"🚀 /start от {update.effective_user.id}")
     text = """Самозанятый Иванов Иван Иванович
 Зарегистрирован г.Минск ул Петра Мстиславца 9
@@ -33,59 +37,55 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 Продаем только оригинальный товар!"""
     keyboard = [[InlineKeyboardButton("Выбрать товары", callback_data="catalog")]]
-    await update.message.reply_photo(
+    update.message.reply_photo(
         photo="https://drive.google.com/uc?export=download&id=1YmdAxQZD5GDnzV08HG429StHM4pFll05",
         caption=text,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def button_callback(update: Update, context):
     query = update.callback_query
-    await query.answer()
+    query.answer()
     if query.data == "catalog":
-        await query.message.reply_photo(
+        query.message.reply_photo(
             photo="https://drive.google.com/uc?export=download&id=111BeCUFi_saVPxGvgF3k0c4sWShBdJbC",
             caption="👟 Кеды Лидские арт. 1234567\n\n💰 Цена 105 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
-        await query.message.reply_photo(
+        query.message.reply_photo(
             photo="https://drive.google.com/uc?export=download&id=1voH__n5tiTlbQVvljrZt7ecn-sxWZCpw",
             caption="👟 Кроссовки New Balance Арт. 123456789\n\n💰 Цена 250 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
 
-# Глобальное состояние
-application = None
-bot_ready = False
-
-app = FastAPI()
-
-@app.on_event("startup")
-async def startup():
-    global application, bot_ready
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global updater, bot_ready
     logger.info("🔄 Инициализация...")
     
     try:
-        # Создание приложения
-        application = Application.builder().token(TOKEN).build()
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CallbackQueryHandler(button_callback))
+        updater = Updater(token=TOKEN, use_context=True)
+        dispatcher = updater.dispatcher
         
-        # ✅ КРИТИЧНО: правильная последовательность v20.7
-        await application.initialize()
-        await application.start()
+        dispatcher.add_handler(CommandHandler("start", start))
+        dispatcher.add_handler(CallbackQueryHandler(button_callback))
         
-        # Webhook
-        await application.bot.delete_webhook(drop_pending_updates=True)
-        await application.bot.set_webhook(WEBHOOK_URL)
-        
-        webhook_info = await application.bot.get_webhook_info()
+        updater.bot.set_webhook(WEBHOOK_URL)
+        webhook_info = updater.bot.get_webhook_info()
         logger.info(f"✅ WEBHOOK OK: {webhook_info.url}")
         bot_ready = True
         
     except Exception as e:
         logger.error(f"❌ Startup error: {e}")
-        raise
+        bot_ready = False
+    
+    yield
+    
+    if updater:
+        updater.bot.delete_webhook()
+        logger.info("🛑 Bot stopped")
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def root():
@@ -97,17 +97,17 @@ async def ping():
 
 @app.post("/webhook")
 async def webhook(request: Request):
-    global application, bot_ready
+    global updater, bot_ready
     
-    if not bot_ready or not application:
+    if not bot_ready or not updater:
         raise HTTPException(status_code=503, detail="Bot loading...")
     
     try:
         json_update = await request.json()
-        update = Update.de_json(json_update, application.bot)
+        update = Update.de_json(json_update, updater.bot)
         
-        if update and update.to_dict():
-            await application.process_update(update)
+        if update:
+            updater.dispatcher.process_update(update)
             logger.info("✅ Processed")
         
         return {"ok": True}
