@@ -54,11 +54,10 @@ def button_callback(update: Update, context):
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
 
-# 🔥 УПРОЩЁННЫЙ lifespan — БЕЗ Updater!
+# ✅ УПРОЩЁННЫЙ lifespan БЕЗ Updater
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🔄 Инициализация...")
-    bot_ready = True
     
     try:
         bot = Bot(token=TOKEN)
@@ -67,7 +66,6 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ WEBHOOK установлен: {WEBHOOK_URL}")
     except Exception as e:
         logger.error(f"❌ Startup: {e}")
-        bot_ready = False
     
     yield
     
@@ -89,7 +87,7 @@ async def ping():
 async def keepalive():
     return {"status": "🟢 ALIVE", "timestamp": "2026-02-06"}
 
-# 🔥 ГЛАВНЫЙ ФИКС — ПРЯМАЯ обработка webhook!
+# ✅ ПРЯМАЯ обработка webhook
 @app.post("/webhook")
 async def webhook(request: Request):
     try:
