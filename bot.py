@@ -70,14 +70,13 @@ async def lifespan(app: FastAPI):
         dispatcher.add_handler(CommandHandler("start", start))
         dispatcher.add_handler(CallbackQueryHandler(button_callback))
         
-        # 🔥 WEBHOOK ФИКС — ВСТАВЬ МЕЖДУ ЭТИМИ СТРОКАМИ:
-        logger.info(f"🔄 Webhook setup: {WEBHOOK_URL}")
-        updater.bot.delete_webhook(drop_pending_updates=True)
-        updater.bot.set_webhook(WEBHOOK_URL)
+      # 🔥 ФИКС — отдельный Bot для webhook:
+        from telegram import Bot
+        bot = Bot(token=TOKEN)
+        bot.delete_webhook(drop_pending_updates=True)
+        bot.set_webhook(WEBHOOK_URL)
+        logger.info(f"✅ WEBHOOK установлен: {WEBHOOK_URL}")
         
-        webhook_info = updater.bot.get_webhook_info()
-        logger.info(f"✅ WEBHOOK: {webhook_info.url}")
-        logger.info(f"✅ Pending: {webhook_info.pending_update_count}")
         bot_ready = True
         
     except Exception as e:
@@ -130,6 +129,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🌐 Port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
