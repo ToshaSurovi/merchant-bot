@@ -70,13 +70,18 @@ async def lifespan(app: FastAPI):
         dispatcher.add_handler(CommandHandler("start", start))
         dispatcher.add_handler(CallbackQueryHandler(button_callback))
         
+        # 🔥 WEBHOOK ФИКС — ВСТАВЬ МЕЖДУ ЭТИМИ СТРОКАМИ:
+        logger.info(f"🔄 Webhook setup: {WEBHOOK_URL}")
+        updater.bot.delete_webhook(drop_pending_updates=True)
         updater.bot.set_webhook(WEBHOOK_URL)
+        
         webhook_info = updater.bot.get_webhook_info()
-        logger.info(f"✅ WEBHOOK OK: {webhook_info.url}")
+        logger.info(f"✅ WEBHOOK: {webhook_info.url}")
+        logger.info(f"✅ Pending: {webhook_info.pending_update_count}")
         bot_ready = True
         
     except Exception as e:
-        logger.error(f"❌ Startup error: {e}")
+        logger.error(f"❌ Startup: {e}")
         bot_ready = False
     
     yield
@@ -123,4 +128,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🌐 Port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
