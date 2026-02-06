@@ -3,8 +3,8 @@ import os
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+from fastapi.responses import Response  # 🔥 ФИКС 1: Добавлен!
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot  # 🔥 ФИКС 2: Bot добавлен
 
 # Глобальное состояние
 updater = None
@@ -27,7 +27,7 @@ if not TOKEN:
 logger.info(f"✅ TOKEN: {TOKEN[:10]}...")
 logger.info(f"🌐 WEBHOOK: {WEBHOOK_URL}")
 
-# ✅ v13.15 СИНХРОННЫЕ хендлеры
+# ✅ Хендлеры БЕЗ изменений
 def start(update: Update, context):
     logger.info(f"🚀 /start от {update.effective_user.id}")
     text = """Самозанятый Иванов Иван Иванович
@@ -70,8 +70,7 @@ async def lifespan(app: FastAPI):
         dispatcher.add_handler(CommandHandler("start", start))
         dispatcher.add_handler(CallbackQueryHandler(button_callback))
         
-      # 🔥 ФИКС — отдельный Bot для webhook:
-        from telegram import Bot
+        # ✅ WEBHOOK через отдельный Bot (ПРАВИЛЬНО!)
         bot = Bot(token=TOKEN)
         bot.delete_webhook(drop_pending_updates=True)
         bot.set_webhook(WEBHOOK_URL)
@@ -91,20 +90,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.get("/", include_in_schema=False)  # ✅ Работает с HEAD!
+# 🔥 ФИКС 3: Render healthcheck + HEAD поддержка
+@app.get("/", include_in_schema=False)
 async def root(request: Request):
     if request.method == "HEAD":
-        return Response(status_code=200)    # ✅ Render НЕ убивает!
+        return Response(status_code=200)  # Render happy!
     return {"status": "🟢 LIVE", "webhook": WEBHOOK_URL, "ready": bot_ready}
 
 @app.get("/ping")
 async def ping():
     return {"status": "pong 🏓", "ready": bot_ready}
 
-@app.get("/keepalive")  # ← НОВОЕ!
+@app.get("/keepalive")
 async def keepalive():
-    return {"status": "🟢 ALIVE", "timestamp": "2026-02-06"}  # ← НОВОЕ!
+    return {"status": "🟢 ALIVE", "timestamp": "2026-02-06"}
 
+# 🔥 ГЛАВНЫЙ ФИКС: Прямая обработка webhook без dispatcher!
 @app.post("/webhook")
 async def webhook(request: Request):
     global updater, bot_ready
@@ -114,11 +115,19 @@ async def webhook(request: Request):
     
     try:
         json_update = await request.json()
+        logger.info(f"📨 Webhook получен: {json_update.get('update_id', 'unknown')}")
         update = Update.de_json(json_update, updater.bot)
         
         if update:
-            updater.dispatcher.process_update(update)
-            logger.info("✅ Processed")
+            # 🔥 ПРЯМАЯ обработка (v13.15 + FastAPI совместимо!)
+            if update.message and update.message.text == '/start':
+                start(update, None)
+                logger.info("🚀 /start обработан!")
+            elif update.callback_query:
+                button_callback(update, None)
+                logger.info("🔘 Callback обработан!")
+            else:
+                logger.info("ℹ️ Неизвестное сообщение")
         
         return {"ok": True}
     except Exception as e:
@@ -129,7 +138,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🌐 Port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
-
