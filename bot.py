@@ -26,15 +26,17 @@ logger.info(f"🌐 WEBHOOK: {WEBHOOK_URL}")
 # Хендлеры
 def start(update: Update, context):
     logger.info(f"🚀 /start от {update.effective_user.id}")
-    text = """Самозанятый Иванов Иван Иванович
-Зарегистрирован г.Минск ул Петра Мстиславца 9
-УНП 123456789
-+375(29) 1112233
-
-Продаем только оригинальный товар!"""
+    text = """Продавец: Самозанятый Иванов Иван Иванович
+Зарегистрирован: г. Минск, ул. Петра Мстиславца, 9
+УНП BA123456
+Регистрация: ИМНС по Первомайскому району г. Минска
+Юридический и почтовый адрес: 220114, Республика Беларусь, г. Минск, ул. Петра Мстиславца, 9
+Телефон: +375 (29) 111-22-33, электронная почта: mylo@gmail.com
+Для Оформления заказа и получения ссылки на оплату свяжитесь по телоефону +375 (29) 111-22-33,
+Продаем крафтовое мыло!"""
     keyboard = [[InlineKeyboardButton("Выбрать товары", callback_data="catalog")]]
     update.message.reply_photo(
-        photo="https://drive.google.com/uc?export=download&id=1YmdAxQZD5GDnzV08HG429StHM4pFll05",
+        photo="https://drive.google.com/uc?export=download&id=13fIvNBs3rc2ygCqp0boZQgaW76yZvRg3",
         caption=text,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -44,13 +46,13 @@ def button_callback(update: Update, context):
     query.answer()
     if query.data == "catalog":
         query.message.reply_photo(
-            photo="https://drive.google.com/uc?export=download&id=111BeCUFi_saVPxGvgF3k0c4sWShBdJbC",
-            caption="👟 Кеды Лидские арт. 1234567\n\n💰 Цена 105 BYN",
+            photo="https://drive.google.com/uc?export=download&id=13PulEWZCQ4f5yrUVmm6BDvbxHBaA-6nt",
+            caption="Ароматное мыло ручной работы для лица и тела Арт. 1234567\n\n💰 Цена 5 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
         query.message.reply_photo(
-            photo="https://drive.google.com/uc?export=download&id=1voH__n5tiTlbQVvljrZt7ecn-sxWZCpw",
-            caption="👟 Кроссовки New Balance Арт. 123456789\n\n💰 Цена 250 BYN",
+            photo="https://drive.google.com/uc?export=download&id=1syCff3Anitk9hy9DGjz5um7Xb20rpKH3",
+            caption="роматное мыло ручной работы для лица и тела Арт. 123456789\n\n💰 Цена 7 BYN",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🛒 Купить", url="https://www.alfabank.by/business/payment/internet-acquiring/")]])
         )
 
@@ -113,3 +115,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     logger.info(f"🌐 Port: {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
+
